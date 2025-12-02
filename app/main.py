@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
-from .database import get_db, init_db
+from .database import get_db
 from .models import User
 from .schemas import UserCreate, UserLogin, UserResponse, LoginResponse
 from .auth import hash_password, verify_password, create_access_token
@@ -14,12 +14,6 @@ app = FastAPI(
 )
 
 security = HTTPBearer()
-
-@app.on_event("startup")
-def startup():
-    init_db()
-    logger.info("User service started")
-
 
 @app.post(
     "/auth/register", 
