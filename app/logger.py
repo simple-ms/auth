@@ -1,10 +1,21 @@
 import logging
 import sys
+from pythonjsonlogger import jsonlogger
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - [%(levelname)s] - %(name)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
+def get_logger(service_name: str):
+    logger = logging.getLogger(service_name)
+    
+    if not logger.handlers:
+        handler = logging.StreamHandler(sys.stdout)
 
-logger = logging.getLogger("user-service")
+        formatter = jsonlogger.JsonFormatter(
+            '%(asctime)s %(levelname)s %(name)s %(message)s',
+            datefmt="%Y-%m-%d %H:%M:%S"
+        )
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+        
+    return logger
+
+logger = get_logger("auth-service")
