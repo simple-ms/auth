@@ -1,6 +1,7 @@
 from typing import Dict
 from fastapi import FastAPI, HTTPException, Depends, Security, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
@@ -24,6 +25,15 @@ app = FastAPI(
     docs_url="/docs/auth",
     openapi_url="/openapi.json/auth",
     redoc_url="/redoc/auth"
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:8080", "http://127.0.0.1:8080"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 security = HTTPBearer()
@@ -97,10 +107,20 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
 
 @app.post("/auth/login", response_model=TokenResponse)
 async def login(login_data: UserLogin, db: AsyncSession = Depends(get_db)):
+    logger.info(f"Login attempt for email: {login_data.email}")
     result = await db.execute(select(User).filter(User.email == login_data.email))
     user = result.scalar_one_or_none()
     
-    if not user or not verify_password(login_data.password, user.password):
+    if not user:
+        logger.warning(f"User not found: {login_data.email}")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    logger.info(f"User found: {user.email}, verifying password...")
+    password_valid = verify_password(login_data.password, user.password)
+    logger.info(f"Password verification result: {password_valid}")
+    
+    if not password_valid:
+        logger.warning(f"Invalid password for user: {login_data.email}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     access, refresh = create_tokens({
