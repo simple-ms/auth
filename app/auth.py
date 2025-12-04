@@ -6,14 +6,8 @@ from passlib.hash import argon2
 import jwt
 from fastapi import HTTPException, status
 
-from .config import (
-    JWT_SECRET_KEY,
-    JWT_ALGORITHM,
-    JWT_EXPIRATION_MINUTES,
-    JWT_REFRESH_EXPIRATION_DAYS,
-    ISSUER,
-    AUDIENCE
-)
+from .settings import settings
+
 
 def hash_password(password: str) -> str:
     """Hash a password using Argon2."""
@@ -31,8 +25,8 @@ def create_tokens(data: Dict[str, str]) -> Tuple[str, str]:
     now = datetime.now(timezone.utc)
     
     base_payload = {
-        "iss": ISSUER,
-        "aud": AUDIENCE,
+        "iss": settings.ISSUER,
+        "aud": settings.AUDIENCE,
         "iat": now,
     }
     
@@ -40,20 +34,20 @@ def create_tokens(data: Dict[str, str]) -> Tuple[str, str]:
     access_payload = base_payload.copy()
     access_payload.update(data)
     access_payload.update({
-        "exp": now + timedelta(minutes=JWT_EXPIRATION_MINUTES),
+        "exp": now + timedelta(minutes=settings.JWT_EXPIRATION_MINUTES),
         "type": "access" # Explicit type
     })
-    access_token = jwt.encode(access_payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    access_token = jwt.encode(access_payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
     # 2. Create Refresh Token
     refresh_payload = base_payload.copy()
     refresh_payload.update(data)
     refresh_payload.update({
-        "exp": now + timedelta(days=JWT_REFRESH_EXPIRATION_DAYS),
+        "exp": now + timedelta(days=settings.JWT_REFRESH_EXPIRATION_DAYS),
         "type": "refresh", # Explicit type
         "jti": str(uuid.uuid4())
     })
-    refresh_token = jwt.encode(refresh_payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    refresh_token = jwt.encode(refresh_payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
     return access_token, refresh_token
 
@@ -65,10 +59,10 @@ def _decode_jwt(token: str) -> Dict:
     try:
         return jwt.decode(
             token,
-            JWT_SECRET_KEY,
-            algorithms=[JWT_ALGORITHM],
-            audience=AUDIENCE,
-            issuer=ISSUER
+            settings.JWT_SECRET_KEY,
+            algorithms=[settings.JWT_ALGORITHM],
+            audience=settings.AUDIENCE,
+            issuer=settings.ISSUER
         )
     except jwt.ExpiredSignatureError:
         raise HTTPException(

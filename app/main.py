@@ -1,10 +1,13 @@
 from typing import Dict
-from fastapi import FastAPI, HTTPException, Depends, Security, Response, status
+from fastapi import FastAPI, HTTPException, Depends, Security, Response, status, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from .database import get_db
 from .models import User
@@ -18,6 +21,9 @@ from .auth import (
 )
 from .logger import logger
 
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(
     title="Auth Service",
     description="Authentication and authorization microservice",
@@ -27,10 +33,14 @@ app = FastAPI(
     redoc_url="/redoc/auth"
 )
 
+# Add rate limiter to app state and error handler
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080", "http://127.0.0.1:8080"],
+    allow_origins=["http://localhost:8080", "http://127.0.0.1:8080", "http://localhost"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -69,11 +79,38 @@ async def get_current_user(
 # --- PUBLIC ENDPOINTS ---
 
 @app.get("/auth/health", tags=["Health"])
-async def health_check():
-    return {"status": "healthy", "service": "auth-service"}
+async def health_check(db: AsyncSession = Depends(get_db)):
+    """Health check endpoint with database connectivity check."""
+    try:
+        await db.execute(select(1))
+        return {
+            "status": "healthy",
+            "service": "auth-service",
+            "database": "connected"
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "status": "unhealthy",
+                "service": "auth-service",
+                "database": "disconnected"
+            }
+        )
 
 @app.post("/auth/register", response_model=TokenResponse, status_code=201)
-async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute")  # Rate limit: 10 registrations per minute per IP
+async def register(
+    request: Request,
+    user_data: UserCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Register a new user.
+    
+    Rate limited to 10 requests per minute per IP address to prevent abuse.
+    """
     logger.info(f"Registration attempt: {user_data.email}")
     try:
         new_user = User(
@@ -106,7 +143,17 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 @app.post("/auth/login", response_model=TokenResponse)
-async def login(login_data: UserLogin, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")  # Rate limit: 5 login attempts per minute per IP
+async def login(
+    request: Request,
+    login_data: UserLogin,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Authenticate user and return tokens.
+    
+    Rate limited to 5 requests per minute per IP address to prevent brute force attacks.
+    """
     logger.info(f"Login attempt for email: {login_data.email}")
     result = await db.execute(select(User).filter(User.email == login_data.email))
     user = result.scalar_one_or_none()
@@ -134,12 +181,15 @@ async def login(login_data: UserLogin, db: AsyncSession = Depends(get_db)):
     }
 
 @app.post("/auth/refresh")
-async def refresh_token(request: RefreshRequest):
+@limiter.limit("30/minute")  # Rate limit: 30 refresh requests per minute
+async def refresh_token(request: Request, refresh_request: RefreshRequest):
     """
     Takes a Refresh Token, validates it, and returns new tokens.
+    
+    Rate limited to 30 requests per minute per IP address.
     """
     # STRICT CHECK: Will raise 401 if token is not type='refresh'
-    payload = verify_refresh_token(request.refresh_token)
+    payload = verify_refresh_token(refresh_request.refresh_token)
     
     new_access, new_refresh = create_tokens({
         "sub": payload["sub"],
@@ -154,7 +204,7 @@ async def refresh_token(request: RefreshRequest):
 @app.get("/auth/validate")
 async def validate(
     response: Response, 
-    payload: Dict = Depends(get_token_payload) # Validates Access Token
+    payload: Dict = Depends(get_token_payload)
 ):
     """
     Called by Nginx auth_request.
@@ -173,11 +223,18 @@ async def validate(
 # --- PROTECTED ENDPOINTS (For Users) ---
 
 @app.put("/auth/password")
+@limiter.limit("3/minute")  # Rate limit: 3 password change attempts per minute
 async def change_password(
+    request: Request,
     password_data: PasswordChange,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    """
+    Change password for authenticated user.
+    
+    Rate limited to 3 requests per minute per IP address.
+    """
     if not verify_password(password_data.old_password, current_user.password):
         raise HTTPException(status_code=400, detail="Old password incorrect")
     
@@ -187,10 +244,30 @@ async def change_password(
     return {"message": "Password changed successfully"}
 
 @app.delete("/auth/me")
+@limiter.limit("3/hour")  # Rate limit: 3 account deletions per hour (very restrictive)
 async def delete_account(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    """
+    Delete the authenticated user's account.
+    
+    Rate limited to 3 requests per hour per IP address.
+    """
     await db.delete(current_user)
     await db.commit()
     return {"message": "Account deleted successfully"}
+
+@app.get("/auth/me")
+async def get_current_user_info(
+    current_user: User = Depends(get_current_user)
+):
+    """Get current user information."""
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "first_name": current_user.first_name,
+        "last_name": current_user.last_name,
+        "role": current_user.role
+    }
