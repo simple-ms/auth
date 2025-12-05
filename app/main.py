@@ -1,7 +1,6 @@
 from typing import Dict
 from fastapi import FastAPI, HTTPException, Depends, Security, Response, status, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
@@ -20,7 +19,6 @@ from .auth import (
     verify_access_token, verify_refresh_token
 )
 from .logger import logger
-from .settings import cors_settings
 
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -38,14 +36,7 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Add CORS middleware with configurable settings
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_settings.origins_list,
-    allow_credentials=cors_settings.CORS_ALLOW_CREDENTIALS,
-    allow_methods=[cors_settings.CORS_ALLOW_METHODS],
-    allow_headers=[cors_settings.CORS_ALLOW_HEADERS],
-)
+# NOTE: CORS is handled by nginx gateway - no CORS middleware here
 
 security = HTTPBearer()
 
