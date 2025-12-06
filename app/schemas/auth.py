@@ -74,13 +74,3 @@ class TokenResponse(BaseModel):
     user_id: UUID
     role: str
 
-
-class UserResponse(BaseModel):
-    """Schema for user profile response."""
-    id: UUID
-    username: str  # Constructed from First/Last name usually, or just use email
-    email: str
-    role: str
-    
-    class Config:
-        from_attributes = True

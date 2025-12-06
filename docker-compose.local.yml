@@ -9,29 +9,30 @@ services:
       - ./app:/app/app
     ports:
       - "8001:8000"
-    environment:
-      DATABASE_URL: postgresql+psycopg2://postgres:postgres@user-db:5432/user_db
-      JWT_SECRET_KEY: "your-super-secret-jwt-key-change-in-production-min-32-chars"
-      JWT_ALGORITHM: "HS256"
-      JWT_EXPIRATION_MINUTES: "60"
-      ISSUER: "auth-service"
-      AUDIENCE: "fastapi-app"
     command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
     depends_on:
-      - user-db
+      - auth-db
+    env_file:
+      - .env
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8000/auth/health || exit 1" ]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
 
-  user-db:
-    image: postgres:17-alpine
-    container_name: user-db
+  auth-db:
+    image: postgres:17
+    container_name: auth-db
     restart: always
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: user_db
+      POSTGRES_DB: auth_db
     ports:
       - "5432:5432"
     volumes:
-      - user-db-data:/var/lib/postgresql/data
+      - auth-db-data:/var/lib/postgresql/data
       # - ./pgdata:/var/lib/postgresql/data
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U postgres" ]
@@ -40,5 +41,5 @@ services:
       retries: 5
 
 volumes:
-  user-db-data:
-    name: user-db-data
+  auth-db-data:
+    name: auth-db-data

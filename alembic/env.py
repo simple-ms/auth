@@ -28,7 +28,7 @@ config = context.config
 # --------------------------------------------------------
 # 3. Overwrite SQLAlchemy URL using your Python config
 # --------------------------------------------------------
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+config.set_main_option("sqlalchemy.url", settings.database_url)
 
 
 # --------------------------------------------------------

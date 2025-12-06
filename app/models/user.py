@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy import String, DateTime, Index
 from sqlalchemy.orm import Mapped, mapped_column
-from .database import Base
+from ..database import Base
 
 
 class User(Base):
@@ -18,7 +18,7 @@ class User(Base):
     password: Mapped[str] = mapped_column(String(255))  # Hashed password
     role: Mapped[str] = mapped_column(String(20), default="buyer")  # 'buyer', 'seller', 'admin'
     
-    # Added timestamps for audit trail
+    # Timestamps for audit trail
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc)
@@ -37,3 +37,4 @@ class User(Base):
     
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email}, role={self.role})>"
+
