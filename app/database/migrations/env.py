@@ -15,9 +15,9 @@ sys.path.append(os.getcwd())
 # --------------------------------------------------------
 # 2. Import Base and settings from your app
 # --------------------------------------------------------
-from app.database import Base          # Your declarative Base
-from app.settings import settings      # Loaded from env/Docker
-from app import models                 # Ensure models are imported
+from app.database import Base              # Your declarative Base
+from app.settings import settings          # Loaded from env/Docker
+from app import models                     # Ensure models are imported
 
 
 # ----------------------------------------------------------------
