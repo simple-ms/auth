@@ -39,7 +39,20 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+  
+  # pgadmin:
+  #   image: dpage/pgadmin4:latest
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: sabuhi@mail.com
+  #     PGADMIN_DEFAULT_PASSWORD: sabuhi123
+  #   container_name: pgadmin
+  #   ports:
+  #     - "5050:80"
+  #   volumes:
+  #     - pgadmin_data:/var/lib/pgadmin
 
 volumes:
   auth-db-data:
     name: auth-db-data
+  # pgadmin_data:
+  #   name: pgadmin_data
