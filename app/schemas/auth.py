@@ -66,11 +66,24 @@ class RefreshRequest(BaseModel):
     refresh_token: str = Field(..., min_length=1, description="Refresh token")
 
 
+class LogoutRequest(BaseModel):
+    """Schema for logout request."""
+    refresh_token: str = Field(..., min_length=1, description="Refresh token to revoke")
+
+
 class TokenResponse(BaseModel):
     """Schema for authentication token response."""
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
     user_id: UUID
+    role: str
+
+
+class UserResponse(BaseModel):
+    """Schema for user registration response (no tokens)."""
+    message: str
+    user_id: str
+    email: str
     role: str
 

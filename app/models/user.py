@@ -18,6 +18,12 @@ class User(Base):
     password: Mapped[str] = mapped_column(String(255))  # Hashed password
     role: Mapped[str] = mapped_column(String(20), default="buyer")  # 'buyer', 'seller', 'admin'
     
+    # Track last login for security monitoring
+    last_login: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+    
     # Timestamps for audit trail
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

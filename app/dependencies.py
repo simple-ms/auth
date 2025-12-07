@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .database import get_db
 from .models import User
-from .repository import UserRepository
+from .repository import UserRepository, RefreshTokenRepository
 from .services import AuthService
 
 security = HTTPBearer()
@@ -16,11 +16,17 @@ async def get_user_repository(db: AsyncSession = Depends(get_db)) -> UserReposit
     return UserRepository(db)
 
 
+async def get_refresh_token_repository(db: AsyncSession = Depends(get_db)) -> RefreshTokenRepository:
+    """Dependency to get RefreshTokenRepository instance."""
+    return RefreshTokenRepository(db)
+
+
 async def get_auth_service(
-    user_repository: UserRepository = Depends(get_user_repository)
+    user_repository: UserRepository = Depends(get_user_repository),
+    refresh_token_repository: RefreshTokenRepository = Depends(get_refresh_token_repository)
 ) -> AuthService:
     """Dependency to get AuthService instance."""
-    return AuthService(user_repository)
+    return AuthService(user_repository, refresh_token_repository)
 
 
 async def get_token_payload(
