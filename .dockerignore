@@ -42,3 +42,4 @@ docker-compose*.local.yml
 Dockerfile/*
 
 .pgdata
+.python-version
