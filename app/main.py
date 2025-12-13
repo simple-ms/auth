@@ -10,7 +10,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from .routes import register_routes
-from .middleware import CSRFMiddleware
+# from .middleware import CSRFMiddleware
 
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -28,20 +28,20 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Add CSRF protection middleware
-# Exempt login, register, and refresh endpoints (they don't have CSRF token yet)
-app.add_middleware(
-    CSRFMiddleware,
-    exempt_paths={
-        "/auth/login",
-        "/auth/register", 
-        "/auth/refresh",
-        "/docs/auth",
-        "/openapi.json/auth",
-        "/redoc/auth",
-        "/health"
-    }
-)
+# CSRF protection middleware - DISABLED for API testing
+# Enable this when you have a proper frontend that can handle CSRF tokens
+# app.add_middleware(
+#     CSRFMiddleware,
+#     exempt_paths={
+#         "/auth/login",
+#         "/auth/register", 
+#         "/auth/refresh",
+#         "/docs/auth",
+#         "/openapi.json/auth",
+#         "/redoc/auth",
+#         "/health"
+#     }
+# )
 
 # NOTE: CORS is handled by nginx gateway - no CORS middleware here
 
